@@ -3,14 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "db:generate": "tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "tsx node_modules/drizzle-kit/bin.cjs migrate",
-    "db:studio": "tsx node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "tsx node_modules/drizzle-kit/bin.cjs studio",
+    "db:seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.15.10",
+    "@node-rs/argon2": "^2.0.0",
     "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {

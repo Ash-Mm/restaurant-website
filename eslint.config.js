@@ -38,6 +38,7 @@ module.exports = tseslint.config(
       sourceType: "module",
       globals: {
         ...globals.node,
+        ...globals.browser,
       },
     },
     rules: {},
