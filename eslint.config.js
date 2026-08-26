@@ -3,7 +3,14 @@ const tseslint = require("typescript-eslint");
 const prettier = require("eslint-config-prettier");
 const globals = require("globals");
 
-module.exports = [
+const tsFiles = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
+
+const typeChecked = [
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
+].map((cfg) => ({ ...cfg, files: tsFiles }));
+
+module.exports = tseslint.config(
   {
     ignores: [
       "**/node_modules/**",
@@ -14,15 +21,10 @@ module.exports = [
     ],
   },
   js.configs.recommended,
+  ...typeChecked,
   {
-    files: ["**/*.ts", "**/*.tsx"],
-    extends: [
-      ...tseslint.configs.strictTypeChecked,
-      ...tseslint.configs.stylisticTypeChecked,
-    ],
+    files: tsFiles,
     languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: "module",
       parserOptions: {
         projectService: true,
         tsconfigRootDir: __dirname,
@@ -39,5 +41,5 @@ module.exports = [
       },
     },
     rules: {},
-  },
-];
+  }
+);
