@@ -106,6 +106,35 @@ erDiagram
 - RBAC guards.
 - Tenant and location guards.
 
+### 5.3.1 V1 role matrix
+
+Roles defined for V1. Role names must **not** be hard-coded in business logic; access is
+enforced through a permission/guard layer. `owner` and `admin` are all-locations-capable.
+
+Roles: `owner`, `admin`, `manager`, `shift manager`, `cashier`, `inventory`, `KDS`, `customer`.
+
+| Module | owner | admin | manager | shift manager | cashier | inventory | KDS | customer |
+|---|---|---|---|---|---|---|---|---|
+| Tenant & locations (settings, branding) | ✓ | ✓ | ✓ | — | — | — | — | — |
+| User & role management | ✓ | ✓ | ✓ | — | — | — | — | — |
+| Menu (categories, products, modifiers) | ✓ | ✓ | ✓ | ◐ view | ◐ view | ◐ view | ◐ view | — |
+| Storefront / online ordering | — | — | — | — | — | — | — | ✓ |
+| Orders (create, status, discounts, refunds) | ✓ | ✓ | ✓ | ✓ discount/status | ✓ create/status | — | — | ✓ own |
+| Payments (cash, terminal, refund) | ✓ | ✓ | ✓ | ✓ cash/terminal | ✓ cash/terminal | — | — | ✓ own |
+| Shifts (open/close) | ✓ | ✓ | ✓ | ✓ | ◐ clock in/out | — | — | — |
+| Inventory (items, movements, counts, transfers) | ✓ | ✓ | ◐ view | ◐ view | — | ✓ | — | — |
+| Purchase orders (suppliers, receive) | ✓ | ✓ | ◐ view | ◐ view | — | ✓ | — | — |
+| KDS (queue, item status) | ◐ view | ◐ view | ◐ view | ◐ view | ◐ view | ◐ view | ✓ | — |
+| Reports | ✓ | ✓ | ✓ | ◐ view | — | ◐ view | — | — |
+| Settings (tax, currency, printer, stations) | ✓ | ✓ | ✓ | — | — | — | — | — |
+| Audit logs (view) | ✓ | ✓ | ✓ | ◐ | — | ◐ | — | — |
+
+Legend: ✓ full access · ◐ view/limited · — none.
+
+Mapping to endpoints follows the access levels already listed in section 15 (API design):
+Manager ≈ Manager/Admin endpoints, Cashier ≈ Cashier endpoints, Inventory ≈ Manager/Inventory,
+KDS ≈ KDS/Manager, Customer ≈ Public/Customer.
+
 ### 5.4 Menu
 
 - Categories.
