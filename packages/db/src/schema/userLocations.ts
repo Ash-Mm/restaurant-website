@@ -1,8 +1,8 @@
 import { foreignKey, index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { baseColumns, locationColumns } from './columns.js';
-import { restaurants } from './restaurants.js';
-import { locations } from './locations.js';
-import { users } from './users.js';
+import { baseColumns, locationColumns } from './columns';
+import { restaurants } from './restaurants';
+import { locations } from './locations';
+import { users } from './users';
 
 export const userLocations = sqliteTable(
   'user_locations',

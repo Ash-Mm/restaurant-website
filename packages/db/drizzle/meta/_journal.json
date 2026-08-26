@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787784248835,
+      "tag": "0000_safe_steve_rogers",
+      "breakpoints": true
+    }
+  ]
+}

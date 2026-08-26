@@ -1,6 +1,6 @@
 import { createClient, type Client } from '@libsql/client';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
-import { schema } from './schema/index.js';
+import { schema } from './schema/index';
 
 function resolveDbUrl(url: string | undefined): string {
   return url ?? 'file:./dev.db';

@@ -1,7 +1,7 @@
 import { foreignKey, index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { baseColumns, tenantColumns } from './columns.js';
-import { restaurants } from './restaurants.js';
-import { users } from './users.js';
+import { baseColumns, tenantColumns } from './columns';
+import { restaurants } from './restaurants';
+import { users } from './users';
 
 export const auditLogs = sqliteTable(
   'audit_logs',

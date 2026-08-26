@@ -1,6 +1,6 @@
 import { foreignKey, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { baseColumns, tenantColumns } from './columns.js';
-import { restaurants } from './restaurants.js';
+import { baseColumns, tenantColumns } from './columns';
+import { restaurants } from './restaurants';
 
 export const locations = sqliteTable(
   'locations',

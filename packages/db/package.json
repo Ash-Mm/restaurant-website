@@ -5,17 +5,18 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "tsx node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "tsx node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio": "tsx node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.38.3",
-    "@libsql/client": "^0.15.10"
+    "@libsql/client": "^0.15.10",
+    "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "drizzle-kit": "^0.30.1",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.3"
   }
 }
