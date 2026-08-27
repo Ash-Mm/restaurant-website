@@ -14,6 +14,12 @@ async function bootstrap() {
     })
   );
 
+  const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: corsOrigins, credentials: true });
+
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
   console.log(`API listening on http://localhost:${String(port)}/api/v1`);
