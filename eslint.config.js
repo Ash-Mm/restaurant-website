@@ -33,11 +33,18 @@ module.exports = tseslint.config(
   },
   prettier,
   {
+    files: ['**/next-env.d.ts', '**/.next/**/*.ts'],
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off',
+    },
+  },
+  {
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
       globals: {
         ...globals.node,
+        ...globals.browser,
       },
     },
     rules: {},
