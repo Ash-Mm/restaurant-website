@@ -72,7 +72,8 @@ pnpm dev
 ### Individual apps
 
 Each app can also be run independently. Shared packages must be built first
-(step 3 above).
+(step 3 above). The API runs via the NestJS CLI (`nest start --watch`), which
+transpiles with decorator metadata so dependency injection works at runtime.
 
 | App         | Package              | Port | Command                                   |
 | ----------- | -------------------- | ---- | ----------------------------------------- |

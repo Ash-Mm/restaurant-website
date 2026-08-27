@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "tsx src/main.ts",
-    "dev": "tsx watch src/main.ts",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
     "test": "jest"
   },
   "dependencies": {
@@ -34,7 +34,6 @@
     "jest": "^29.7.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
-    "tsx": "^4.23.12",
     "typescript": "^5.7.3"
   }
 }
