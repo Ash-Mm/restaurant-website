@@ -1,7 +1,15 @@
+import { loadEnvFile } from 'node:process';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
+
+try {
+  // Load the repo-root .env (cwd is apps/api when run via pnpm --filter).
+  loadEnvFile('../../.env');
+} catch {
+  // .env optional in CI/test where env is injected directly.
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
