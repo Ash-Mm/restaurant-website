@@ -4,9 +4,13 @@ A multi-tenant restaurant ordering and operations platform (template). One resta
 owner can operate multiple locations with a public storefront, online ordering, a POS/KDS
 staff console, kitchen display, inventory, and reporting.
 
-This repository is the **Phase 0** foundation: workspace tooling, a local SQLite database
-(with Drizzle ORM), and the application scaffolds (API + two Next.js apps + a shared UI
-library). Business features are built in later phases.
+This repository contains the **Phase 0** foundation and **Phase 1** features. Phase 0 is
+the workspace tooling, a local SQLite database (with Drizzle ORM), and the application
+scaffolds (API + two Next.js apps + a shared UI library). Phase 1 adds the tenant and
+location backbone: tenant context and location access guards, URL-safe slug validation,
+restaurant creation with an owner account, configurable restaurant settings, location
+CRUD, public tenant resolution for the storefront, branding settings, and the POS admin
+screens (onboarding wizard, location management, branding).
 
 ## Tech stack
 
@@ -64,8 +68,20 @@ Each app is run independently. Shared packages must be built first (step 3 above
 | Storefront  | `@restaurant/storefront` | 3001 | `pnpm --filter @restaurant/storefront dev` |
 | POS / KDS   | `@restaurant/pos`    | 3002 | `pnpm --filter @restaurant/pos dev`       |
 
-The API exposes a global prefix `/api/v1` and a health check at
-`GET /api/v1/health` returning `{ "status": "ok" }`.
+The API exposes a global prefix `/api/v1`. It ships a health check at
+`GET /api/v1/health` returning `{ "status": "ok" }`, plus the Phase 1 tenant and location
+endpoints:
+
+| Method | Path                              | Purpose                                              |
+| ------ | --------------------------------- | ---------------------------------------------------- |
+| POST   | `/api/v1/admin/tenants`           | Create a restaurant (with owner role + account)      |
+| GET    | `/api/v1/admin/settings`          | Read restaurant settings                             |
+| PATCH  | `/api/v1/admin/settings`          | Update currency, timezone, language                  |
+| PATCH  | `/api/v1/admin/settings/branding` | Update logo, brand color, receipt header/footer     |
+| POST   | `/api/v1/admin/upload`            | Local logo upload (placeholder for S3)              |
+| GET    | `/api/v1/admin/locations`         | List locations                                       |
+| POST   | `/api/v1/admin/locations`         | Create a location                                    |
+| GET    | `/api/v1/public/:slug/menu`       | Public tenant profile resolved by slug               |
 
 > **Database URL:** the API reads `DATABASE_URL` (default `file:./dev.db`,
 > relative to the process working directory). When started from the repo root,
@@ -77,6 +93,7 @@ The API exposes a global prefix `/api/v1` and a health check at
 ```bash
 pnpm lint            # ESLint across the workspace
 pnpm typecheck       # tsc --noEmit for every package that defines it
+pnpm test            # run API test suite (Jest)
 pnpm --filter "@restaurant/*" build   # build all shared packages to dist/
 pnpm build           # build every package/app recursively
 ```
@@ -94,14 +111,14 @@ pnpm --filter @restaurant/db db:studio     # open Drizzle Studio
 
 ```
 apps/
-  api/          # NestJS API (health, global validation pipe)
-  storefront/   # Next.js public ordering site (port 3001)
-  pos/          # Next.js POS / KDS / Admin console (port 3002)
+  api/          # NestJS API (health, guards, tenant & location modules)
+  storefront/   # Next.js public ordering site (port 3001) + tenant slug middleware
+  pos/          # Next.js POS / KDS / Admin console (port 3002) + admin screens
 packages/
   db/           # Drizzle schema, client, migrations, seed
   ui/           # Shared components (cn util, Button) + Tailwind
   config/       # Shared typed config (API/public URLs)
-  contracts/    # Shared types (placeholder for now)
+  contracts/    # Shared types + URL-safe slug validation
   printer/      # Printing types (placeholder for now)
 ```
 
@@ -126,3 +143,16 @@ packages/
 - [x] Next.js storefront scaffold
 - [x] Next.js POS/KDS/admin scaffold
 - [x] Shared UI package (Tailwind + shadcn-style Button)
+
+## Phase 1 status (tenant & locations)
+
+- [x] Tenant context guard (`restaurant id` resolved + verified from auth)
+- [x] Location access guard (verifies user access to requested `location id`)
+- [x] URL-safe slug validation in `@restaurant/contracts`
+- [x] Restaurant creation endpoint (creates restaurant + owner role + owner account)
+- [x] Restaurant settings (configurable currency, timezone, language)
+- [x] Location CRUD (create, list, enable/disable branches)
+- [x] Public tenant resolution (`/api/v1/public/:slug/menu` + storefront `/r/:slug` middleware)
+- [x] Branding settings (logo upload, brand color, receipt header/footer)
+- [x] POS admin screens: onboarding wizard, location management, branding
+- [x] API test suite (18 integration/unit tests across guards, tenant, location, public)
