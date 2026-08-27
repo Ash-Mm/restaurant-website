@@ -12,10 +12,12 @@
     "format": "prettier --write .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "build": "pnpm -r --if-present build"
+    "build": "pnpm -r --if-present build",
+    "dev": "pnpm --filter \"@restaurant/*\" build && concurrently -n api,storefront,pos -c auto \"pnpm --filter @restaurant/api dev\" \"pnpm --filter @restaurant/storefront dev\" \"pnpm --filter @restaurant/pos dev\""
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
+    "concurrently": "^10.0.5",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^9.1.0",
     "globals": "^15.15.0",

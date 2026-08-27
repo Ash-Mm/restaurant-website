@@ -60,7 +60,19 @@ The database lives at `packages/db/dev.db` (gitignored). The seed creates:
 
 ## Running the apps
 
-Each app is run independently. Shared packages must be built first (step 3 above).
+### All apps at once
+
+From the repo root, build the shared packages and start all three dev servers
+(API on 3000, storefront on 3001, POS on 3002) in a single terminal:
+
+```bash
+pnpm dev
+```
+
+### Individual apps
+
+Each app can also be run independently. Shared packages must be built first
+(step 3 above).
 
 | App         | Package              | Port | Command                                   |
 | ----------- | -------------------- | ---- | ----------------------------------------- |
@@ -83,14 +95,16 @@ endpoints:
 | POST   | `/api/v1/admin/locations`         | Create a location                                    |
 | GET    | `/api/v1/public/:slug/menu`       | Public tenant profile resolved by slug               |
 
-> **Database URL:** the API reads `DATABASE_URL` (default `file:./dev.db`,
-> relative to the process working directory). When started from the repo root,
-> point it at the seeded file, e.g.
-> `DATABASE_URL=file:./packages/db/dev.db pnpm --filter @restaurant/api dev`.
+> **Environment:** the API auto-loads the repo-root `.env` at startup, so
+> `DATABASE_URL`, `CORS_ORIGIN`, `PORT`, `JWT_SECRET`, etc. are read from there.
+> `CORS_ORIGIN` is a comma-separated list of allowed browser origins (defaults to
+> `http://localhost:3000`); it already includes `3001` (storefront) and `3002` (POS).
+> The database defaults to `file:./packages/db/dev.db` (seeded in step 5).
 
 ## Useful scripts
 
 ```bash
+pnpm dev             # build shared packages + run all 3 apps (api, storefront, pos)
 pnpm lint            # ESLint across the workspace
 pnpm typecheck       # tsc --noEmit for every package that defines it
 pnpm test            # run API test suite (Jest)
