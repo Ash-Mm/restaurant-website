@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * pages can serve every restaurant.
  */
 export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname ?? '/';
+  const pathname = request.nextUrl.pathname;
   const match = /^\/r\/([^/]+)(?:\/|$)/.exec(pathname);
   if (!match) {
     return NextResponse.next();
