@@ -146,6 +146,78 @@ packages/
 - Shared packages build to `dist/` and are consumed as built JS; they are not run
   from source in this Phase 0 setup.
 
+## Testing Phase 1
+
+### Automated tests
+
+```bash
+pnpm --filter @restaurant/api test
+```
+
+Runs the Jest suite (18 tests across 4 files): slug validation, tenant + location
+guards, tenant/location CRUD integration, and public-profile/branding integration.
+Migrations are applied to an in-memory SQLite database per test file, so no local
+`dev.db` state is touched.
+
+### Manual smoke test (API)
+
+Start everything with `pnpm dev`, then exercise the endpoints (the API runs on
+`:3000`). Replace `test-cafe` with any slug you create.
+
+```bash
+# Health
+curl http://localhost:3000/api/v1/health
+
+# Onboarding: create a tenant (restaurant + owner role + account + default branch)
+curl -X POST http://localhost:3000/api/v1/admin/tenants \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Cafe","slug":"test-cafe","fullName":"Admin User",\
+"email":"admin@test.com","password":"password123","currency":"EGP",\
+"timezone":"Africa/Cairo","defaultLanguage":"en"}'
+
+# Read settings (requires the tenant slug header)
+curl http://localhost:3000/api/v1/admin/settings -H "x-restaurant-slug: test-cafe"
+
+# Update settings
+curl -X PATCH http://localhost:3000/api/v1/admin/settings \
+  -H "x-restaurant-slug: test-cafe" -H "Content-Type: application/json" \
+  -d '{"currency":"USD","timezone":"America/New_York"}'
+
+# Update branding (logo URL, brand color, receipt text)
+curl -X PATCH http://localhost:3000/api/v1/admin/settings/branding \
+  -H "x-restaurant-slug: test-cafe" -H "Content-Type: application/json" \
+  -d '{"brandColor":"#1A2B3C","receiptHeader":"Thanks for visiting!"}'
+
+# Create + list locations
+curl -X POST http://localhost:3000/api/v1/admin/locations \
+  -H "x-restaurant-slug: test-cafe" -H "Content-Type: application/json" \
+  -d '{"name":"Downtown","address":"123 Main St"}'
+curl http://localhost:3000/api/v1/admin/locations -H "x-restaurant-slug: test-cafe"
+
+# Public tenant resolution (no auth header needed)
+curl http://localhost:3000/api/v1/public/test-cafe/menu
+
+# Logo upload (save a small PNG as logo.png first)
+curl -X POST http://localhost:3000/api/v1/admin/upload \
+  -H "x-restaurant-slug: test-cafe" -F "file=@logo.png"
+```
+
+### Manual smoke test (frontend)
+
+1. **POS** (`http://localhost:3002`)
+   - Onboarding wizard (`/onboarding`): fill the two-step form and submit. You are
+     redirected to `/locations` and the slug is stored in `localStorage`.
+   - Locations (`/locations`): the created branch is listed; add another branch and
+     confirm it appears.
+   - Branding (`/branding`): existing logo/color/receipt text load on open; pick a
+     color (the hex input stays in sync), upload a logo, edit receipt text, and Save.
+     Refresh — values should persist.
+2. **Storefront** (`http://localhost:3001/r/test-cafe`): the public tenant profile
+   resolves by slug (set via the `/r/:slug` middleware).
+
+> The API auto-applies pending migrations on boot (`OnModuleInit` → `runMigrations`),
+> so the local `dev.db` stays in sync with the schema without a manual step.
+
 ## Phase 0 status
 
 - [x] DevOps tooling (pnpm workspace, strict TS, ESLint, Prettier, `.env.example`)

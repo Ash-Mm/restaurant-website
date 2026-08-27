@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { TenantGuard } from '../auth/tenant.guard.js';
 import { RestaurantId } from '../auth/restaurant.decorator.js';
@@ -16,7 +16,7 @@ export class SettingsController {
     return this.service.getSettings(restaurantId);
   }
 
-  @Put()
+  @Patch()
   update(
     @RestaurantId() restaurantId: string,
     @Body(new ZodValidationPipe(updateSettingsSchema)) dto: UpdateSettingsDto
