@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, jest } from '@jest/globals';
 import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { TenantGuard } from './tenant.guard.js';
 import { LocationGuard } from './location.guard.js';
@@ -19,15 +19,17 @@ function ctxFor(headers: Record<string, string | undefined>, restaurantId?: stri
 
 function fakeRepo(overrides: Partial<TenantRepository> = {}): TenantRepository {
   return {
-    findBySlug: vi.fn(),
-    verifyLocation: vi.fn(),
+    findBySlug: jest.fn<(slug: string) => Promise<{ id: string } | null>>(),
+    verifyLocation: jest.fn<(locationId: string, restaurantId: string) => Promise<boolean>>(),
     ...overrides,
   } as unknown as TenantRepository;
 }
 
 describe('TenantGuard', () => {
   it('attaches restaurantId resolved from slug header', async () => {
-    const repo = fakeRepo({ findBySlug: vi.fn().mockResolvedValue({ id: 'r1' }) });
+    const repo = fakeRepo({
+      findBySlug: jest.fn<(slug: string) => Promise<{ id: string } | null>>().mockResolvedValue({ id: 'r1' }),
+    });
     const guard = new TenantGuard(repo);
     const ctx = ctxFor({ 'x-restaurant-slug': 'acme' });
     expect(await guard.canActivate(ctx)).toBe(true);
@@ -42,7 +44,9 @@ describe('TenantGuard', () => {
   });
 
   it('throws on unknown slug', async () => {
-    const repo = fakeRepo({ findBySlug: vi.fn().mockResolvedValue(null) });
+    const repo = fakeRepo({
+      findBySlug: jest.fn<(slug: string) => Promise<{ id: string } | null>>().mockResolvedValue(null),
+    });
     const guard = new TenantGuard(repo);
     await expect(guard.canActivate(ctxFor({ 'x-restaurant-slug': 'nope' }))).rejects.toBeInstanceOf(
       UnauthorizedException
@@ -52,7 +56,9 @@ describe('TenantGuard', () => {
 
 describe('LocationGuard', () => {
   it('verifies location for the resolved restaurant', async () => {
-    const repo = fakeRepo({ verifyLocation: vi.fn().mockResolvedValue(true) });
+    const repo = fakeRepo({
+      verifyLocation: jest.fn<(locationId: string, restaurantId: string) => Promise<boolean>>().mockResolvedValue(true),
+    });
     const guard = new LocationGuard(repo);
     const ctx = ctxFor({ 'x-location-id': 'l1' }, 'r1');
     expect(await guard.canActivate(ctx)).toBe(true);
@@ -69,7 +75,9 @@ describe('LocationGuard', () => {
   });
 
   it('throws on unknown location', async () => {
-    const repo = fakeRepo({ verifyLocation: vi.fn().mockResolvedValue(false) });
+    const repo = fakeRepo({
+      verifyLocation: jest.fn<(locationId: string, restaurantId: string) => Promise<boolean>>().mockResolvedValue(false),
+    });
     const guard = new LocationGuard(repo);
     await expect(guard.canActivate(ctxFor({ 'x-location-id': 'l1' }, 'r1'))).rejects.toBeInstanceOf(
       UnauthorizedException

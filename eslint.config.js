@@ -23,6 +23,8 @@ module.exports = tseslint.config(
       "**/*.config.cts",
       "**/*.config.mjs",
       "**/*.config.js",
+      "**/jest.setup.ts",
+      "**/jest.config.cjs",
     ],
   },
   js.configs.recommended,
@@ -60,6 +62,12 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
+    files: tsFiles,
+    rules: {
+      '@typescript-eslint/no-extraneous-class': 'off',
     },
   },
   {

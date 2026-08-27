@@ -6,7 +6,7 @@ function resolveDbUrl(url: string | undefined): string {
   return url ?? 'file:./dev.db';
 }
 
-type Database = LibSQLDatabase<typeof schema> & { $client: Client };
+export type Database = LibSQLDatabase<typeof schema> & { $client: Client };
 
 let client: Client | null = null;
 let db: Database | null = null;
