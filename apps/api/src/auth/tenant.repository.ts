@@ -64,6 +64,13 @@ export class TenantRepository {
     return row;
   }
 
+  async listActiveLocations(restaurantId: string, db: Db = getDb()) {
+    return db
+      .select({ id: locations.id, name: locations.name })
+      .from(locations)
+      .where(and(eq(locations.restaurantId, restaurantId), eq(locations.active, 1)));
+  }
+
   async listSettings(restaurantId: string, db: Db = getDb()) {
     return db
       .select({ key: settings.key, value: settings.value })

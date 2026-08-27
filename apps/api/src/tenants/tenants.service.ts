@@ -108,4 +108,52 @@ export class TenantsService {
     }
     return this.getSettings(restaurantId);
   }
+
+  async getPublicProfile(slug: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    brandColor: string | null;
+    receiptHeader: string | null;
+    receiptFooter: string | null;
+    currency: string;
+    timezone: string;
+    defaultLanguage: string;
+    locations: { id: string; name: string }[];
+  } | null> {
+    const found = await this.repo.findBySlug(slug);
+    if (!found) return null;
+    const restaurant = await this.repo.findById(found.id);
+    if (!restaurant) return null;
+    const locations = await this.repo.listActiveLocations(found.id);
+    return {
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      logoUrl: restaurant.logoUrl ?? null,
+      brandColor: restaurant.brandColor ?? null,
+      receiptHeader: restaurant.receiptHeader ?? null,
+      receiptFooter: restaurant.receiptFooter ?? null,
+      currency: restaurant.currency,
+      timezone: restaurant.timezone,
+      defaultLanguage: restaurant.defaultLanguage,
+      locations,
+    };
+  }
+
+  async updateBranding(restaurantId: string, dto: {
+    logoUrl?: string | null;
+    brandColor?: string | null;
+    receiptHeader?: string | null;
+    receiptFooter?: string | null;
+  }): Promise<{ id: string }> {
+    const update: Partial<typeof restaurants.$inferInsert> = {};
+    if (dto.logoUrl !== undefined) update.logoUrl = dto.logoUrl;
+    if (dto.brandColor !== undefined) update.brandColor = dto.brandColor;
+    if (dto.receiptHeader !== undefined) update.receiptHeader = dto.receiptHeader;
+    if (dto.receiptFooter !== undefined) update.receiptFooter = dto.receiptFooter;
+    await this.repo.updateRestaurant(restaurantId, update);
+    return { id: restaurantId };
+  }
 }

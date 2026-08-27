@@ -9,6 +9,8 @@ export const restaurants = sqliteTable(
     slug: text('slug').notNull(),
     logoUrl: text('logo_url'),
     brandColor: text('brand_color'),
+    receiptHeader: text('receipt_header'),
+    receiptFooter: text('receipt_footer'),
     defaultLanguage: text('default_language').notNull().default('en'),
     currency: text('currency').notNull().default('EGP'),
     timezone: text('timezone').notNull().default('UTC'),

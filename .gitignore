@@ -14,3 +14,7 @@ coverage/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Local uploads (placeholder for S3)
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep

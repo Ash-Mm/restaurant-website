@@ -5,9 +5,11 @@ import { LocationGuard } from '../auth/location.guard.js';
 import { TenantsService } from './tenants.service.js';
 import { TenantsController } from './tenants.controller.js';
 import { SettingsController } from './settings.controller.js';
+import { PublicController } from './public.controller.js';
+import { UploadController } from './upload.controller.js';
 
 @Module({
-  controllers: [TenantsController, SettingsController],
+  controllers: [TenantsController, SettingsController, PublicController, UploadController],
   providers: [TenantsService, TenantRepository, TenantGuard, LocationGuard],
 })
 export class TenantsModule {}
