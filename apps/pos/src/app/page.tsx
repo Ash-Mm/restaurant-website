@@ -1,4 +1,5 @@
 import { appConfig } from '@restaurant/config';
+import { Button } from '@restaurant/ui';
 
 export default function HomePage() {
   return (
@@ -6,6 +7,7 @@ export default function HomePage() {
       <h1 className="text-2xl font-bold">Restaurant Operations</h1>
       <p className="text-gray-600">POS · KDS · Admin console</p>
       <p className="text-sm text-gray-400">API: {appConfig.apiUrl}</p>
+      <Button variant="outline">Open register</Button>
     </main>
   );
 }
