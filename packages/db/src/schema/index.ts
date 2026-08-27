@@ -1,19 +1,19 @@
-export * from './columns';
-export * from './restaurants';
-export * from './locations';
-export * from './users';
-export * from './roles';
-export * from './userLocations';
-export * from './settings';
-export * from './auditLogs';
+export * from './columns.js';
+export * from './restaurants.js';
+export * from './locations.js';
+export * from './users.js';
+export * from './roles.js';
+export * from './userLocations.js';
+export * from './settings.js';
+export * from './auditLogs.js';
 
-import { restaurants } from './restaurants';
-import { locations } from './locations';
-import { users } from './users';
-import { roles } from './roles';
-import { userLocations } from './userLocations';
-import { settings } from './settings';
-import { auditLogs } from './auditLogs';
+import { restaurants } from './restaurants.js';
+import { locations } from './locations.js';
+import { users } from './users.js';
+import { roles } from './roles.js';
+import { userLocations } from './userLocations.js';
+import { settings } from './settings.js';
+import { auditLogs } from './auditLogs.js';
 
 export const schema = {
   restaurants,

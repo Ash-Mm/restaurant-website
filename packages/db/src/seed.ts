@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { hash } from '@node-rs/argon2';
-import { getDb } from './client';
-import { restaurants, locations, users, roles, userLocations } from './schema';
+import { getDb } from './client.js';
+import { restaurants, locations, users, roles, userLocations } from './schema/index.js';
 
 function firstRow<T>(rows: T[], label: string): T {
   const row = rows[0];

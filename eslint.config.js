@@ -18,6 +18,13 @@ module.exports = tseslint.config(
       "**/build/**",
       "**/coverage/**",
       "**/.next/**",
+      "**/*.config.ts",
+      "**/*.config.mts",
+      "**/*.config.cts",
+      "**/*.config.mjs",
+      "**/*.config.js",
+      "**/jest.setup.ts",
+      "**/jest.config.cjs",
     ],
   },
   js.configs.recommended,
@@ -32,6 +39,37 @@ module.exports = tseslint.config(
     },
   },
   prettier,
+  {
+    files: ['**/*.config.ts', '**/*.config.mts', '**/*.config.cts', '**/*.config.mjs', '**/*.config.js'],
+    languageOptions: {
+      parserOptions: { projectService: false },
+    },
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
+    files: tsFiles,
+    rules: {
+      '@typescript-eslint/no-extraneous-class': 'off',
+    },
+  },
   {
     files: ['**/next-env.d.ts', '**/.next/**/*.ts'],
     rules: {
