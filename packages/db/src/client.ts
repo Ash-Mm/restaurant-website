@@ -6,15 +6,17 @@ function resolveDbUrl(url: string | undefined): string {
   return url ?? 'file:./dev.db';
 }
 
+type Database = LibSQLDatabase<typeof schema> & { $client: Client };
+
 let client: Client | null = null;
-let db: LibSQLDatabase<typeof schema> | null = null;
+let db: Database | null = null;
 
 export function getClient(): Client {
   client ??= createClient({ url: resolveDbUrl(process.env.DATABASE_URL) });
   return client;
 }
 
-export function getDb(): LibSQLDatabase<typeof schema> {
+export function getDb(): Database {
   db ??= drizzle(getClient(), { schema });
   return db;
 }
