@@ -5,6 +5,7 @@ import { ACCESS_TOKEN_TTL } from './auth.constants.js';
 import { AuthRepository } from './auth.repository.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
+import { AuditModule } from '../audit/audit.module.js';
 
 export const LOGIN_RATE_WINDOW_MS = 60_000;
 
@@ -20,6 +21,7 @@ function loginRateLimit(): number {
 
 @Module({
   imports: [
+    AuditModule,
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.JWT_SECRET ?? 'dev-only-change-me',

@@ -106,7 +106,8 @@ type FakeRepo = ReturnType<typeof fakeRepo>;
 function makeService(repo: FakeRepo): AuthService {
   return new AuthService(
     repo as unknown as AuthRepository,
-    new JwtService({ secret: 'test-secret' })
+    new JwtService({ secret: 'test-secret' }),
+    { log: jest.fn(async () => undefined) } as never
   );
 }
 
