@@ -9,6 +9,28 @@ import type { AuthRepository } from './auth.repository.js';
 import type { users } from '@restaurant/db';
 
 type UserRow = typeof users.$inferSelect;
+type TokenRow = {
+  id: string;
+  restaurantId: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  replacedByTokenId: string | null;
+};
+
+function makeToken(overrides: Partial<TokenRow>): TokenRow {
+  return {
+    id: 't1',
+    restaurantId: 'r1',
+    userId: 'u1',
+    tokenHash: 'hash-of-presented-token',
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    revokedAt: null,
+    replacedByTokenId: null,
+    ...overrides,
+  };
+}
 
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
 
@@ -40,6 +62,22 @@ function fakeRepo() {
         expiresAt: string;
       }) => Promise<{ id: string }>
     >(),
+    findTokenByHash: jest.fn<(tokenHash: string) => Promise<TokenRow | null>>(),
+    findUserById: jest.fn<
+      (restaurantId: string, userId: string) => Promise<UserRow | null>
+    >(),
+    rotateRefreshToken: jest.fn<
+      (
+        oldTokenId: string,
+        replacement: {
+          restaurantId: string;
+          userId: string;
+          tokenHash: string;
+          expiresAt: string;
+        }
+      ) => Promise<{ oldRow: TokenRow; newRow: TokenRow }>
+    >(),
+    revokeAllForUser: jest.fn<(userId: string) => Promise<void>>(),
   };
 }
 
@@ -187,5 +225,97 @@ describe('AuthService.login', () => {
       })
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(repo.findUsersByEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.refresh', () => {
+  let repo: FakeRepo;
+
+  beforeEach(() => {
+    repo = fakeRepo();
+  });
+
+  it('rotates the token and returns a new access token for the same user', async () => {
+    const presented = 'raw-refresh-token';
+    repo.findTokenByHash.mockResolvedValue(
+      makeToken({ tokenHash: createHash('sha256').update(presented).digest('hex') })
+    );
+    repo.findUserById.mockResolvedValue(
+      makeUser({ id: 'u1', restaurantId: 'r1', role: 'owner' })
+    );
+
+    repo.rotateRefreshToken.mockImplementation(
+      async (
+        _oldTokenId: string,
+        replacement: { restaurantId: string; userId: string; tokenHash: string }
+      ) => ({
+        oldRow: makeToken({ revokedAt: new Date().toISOString() }),
+        newRow: makeToken({
+          id: 't2',
+          tokenHash: replacement.tokenHash,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      })
+    );
+
+    const service = makeService(repo);
+    const result = await service.refresh(presented);
+
+    expect(result.refreshToken).not.toBe(presented);
+    expect(result.user).toMatchObject({ id: 'u1', role: 'owner' });
+    expect(repo.rotateRefreshToken).toHaveBeenCalledTimes(1);
+    const [oldTokenId, replacement] = repo.rotateRefreshToken.mock.calls[0];
+    expect(oldTokenId).toBe('t1');
+    expect(replacement.tokenHash).toBe(
+      createHash('sha256').update(result.refreshToken).digest('hex')
+    );
+    expect(replacement.userId).toBe('u1');
+
+    const jwt = new JwtService({ secret: 'test-secret' });
+    const payload = await jwt.verifyAsync(result.accessToken);
+    expect(payload).toMatchObject({ sub: 'u1', restaurantId: 'r1' });
+  });
+
+  it('rejects a revoked (already used) token and revokes all tokens for that user', async () => {
+    repo.findTokenByHash.mockResolvedValue(
+      makeToken({ revokedAt: new Date().toISOString() })
+    );
+    const service = makeService(repo);
+
+    await expect(
+      service.refresh('replayed-token')
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(repo.revokeAllForUser).toHaveBeenCalledWith('u1');
+    expect(repo.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects an expired token without rotating', async () => {
+    repo.findTokenByHash.mockResolvedValue(
+      makeToken({ expiresAt: new Date(Date.now() - 1000).toISOString() })
+    );
+    const service = makeService(repo);
+
+    await expect(service.refresh('expired-token')).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+    expect(repo.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token hash that is not in the database', async () => {
+    repo.findTokenByHash.mockResolvedValue(null);
+    const service = makeService(repo);
+
+    await expect(service.refresh('unknown-token')).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+  });
+
+  it('rejects a missing token without touching the database', async () => {
+    const service = makeService(repo);
+
+    await expect(service.refresh(null)).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+    expect(repo.findTokenByHash).not.toHaveBeenCalled();
   });
 });

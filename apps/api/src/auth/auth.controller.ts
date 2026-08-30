@@ -1,8 +1,8 @@
-import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { AuthService } from './auth.service.js';
-import { setRefreshCookie } from './cookies.js';
+import { readRefreshCookie, setRefreshCookie } from './cookies.js';
 import { staffLoginSchema } from './dto/login.dto.js';
 import type { StaffLoginDto } from './dto/login.dto.js';
 
@@ -17,6 +17,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ): Promise<{ accessToken: string; user: unknown }> {
     const result = await this.service.login(dto);
+    setRefreshCookie(res, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
+  }
+
+  @Post('staff/refresh')
+  @HttpCode(200)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<{ accessToken: string; user: unknown }> {
+    const result = await this.service.refresh(readRefreshCookie(req));
     setRefreshCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
   }

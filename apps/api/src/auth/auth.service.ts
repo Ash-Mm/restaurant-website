@@ -99,6 +99,47 @@ export class AuthService {
     });
     return rawToken;
   }
+
+  async refresh(rawToken: string | null): Promise<LoginResult> {
+    if (!rawToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    const token = await this.repo.findTokenByHash(hashRefreshToken(rawToken));
+    if (!token) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (token.revokedAt !== null) {
+      // Reuse of a rotated token means the session material may be stolen:
+      // revoke every active session for this user (token-theft detection).
+      await this.repo.revokeAllForUser(token.userId);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (token.expiresAt <= new Date().toISOString()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const user = await this.repo.findUserById(token.restaurantId, token.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const rawReplacement = randomBytes(32).toString('base64url');
+    await this.repo.rotateRefreshToken(token.id, {
+      restaurantId: token.restaurantId,
+      userId: token.userId,
+      tokenHash: hashRefreshToken(rawReplacement),
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS).toISOString(),
+    });
+    const accessToken = await this.issueAccessToken(user);
+    return {
+      accessToken,
+      refreshToken: rawReplacement,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+      },
+    };
+  }
 }
 
 export { ACCESS_TOKEN_TTL };

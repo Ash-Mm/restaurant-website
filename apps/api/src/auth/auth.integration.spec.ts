@@ -127,4 +127,81 @@ describe('Staff auth (integration)', () => {
       .send({ email: 'not-an-email', password: '' })
       .expect(400);
   });
+
+  async function loginFor(email: string, slug?: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const payload: Record<string, string> = { email, password };
+    if (slug !== undefined) payload.restaurantSlug = slug;
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send(payload)
+      .expect(200);
+    const cookie = (res.headers['set-cookie'] as string[]).find((c) =>
+      c.startsWith('refresh_token=')
+    );
+    if (!cookie) throw new Error('login did not set refresh cookie');
+    return { accessToken: res.body.accessToken, refreshToken: cookie.split(';')[0].split('=')[1] };
+  }
+
+  async function refreshWith(token: string) {
+    return request(app.getHttpServer())
+      .post('/api/v1/auth/staff/refresh')
+      .set('Cookie', `refresh_token=${token}`)
+      .expect((res) => {
+        if (![200, 401].includes(res.status)) {
+          throw new Error(`unexpected status ${String(res.status)}`);
+        }
+      });
+  }
+
+  function tokenFrom(res: { headers: Record<string, unknown> }): string {
+    const cookies = res.headers['set-cookie'] as string[];
+    const cookie = cookies?.find((c) => c.startsWith('refresh_token='));
+    if (!cookie) throw new Error('no refresh cookie on response');
+    return cookie.split(';')[0].split('=')[1];
+  }
+
+  it('rotates the refresh token and invalidates the old one', async () => {
+    const slug = uniqueSlug('auth-refresh');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const session1 = await loginFor(email, slug);
+    const res = await refreshWith(session1.refreshToken);
+    expect(res.status).toBe(200);
+    expect(typeof res.body.accessToken).toBe('string');
+    const session2Token = tokenFrom(res);
+    expect(session2Token).not.toBe(session1.refreshToken);
+
+    // The rotated-away token must no longer be accepted.
+    const replay = await refreshWith(session1.refreshToken);
+    expect(replay.status).toBe(401);
+  });
+
+  it('revokes the entire session when a rotated token is replayed', async () => {
+    const slug = uniqueSlug('auth-reuse');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const s1 = await loginFor(email, slug);
+    const r2 = await refreshWith(s1.refreshToken);
+    expect(r2.status).toBe(200);
+    const t2 = tokenFrom(r2);
+    const r3 = await refreshWith(t2);
+    expect(r3.status).toBe(200);
+    const t3 = tokenFrom(r3);
+
+    // Replaying the first token triggers token-theft detection...
+    const replay = await refreshWith(s1.refreshToken);
+    expect(replay.status).toBe(401);
+    // ...and even the newest token of the session is now dead.
+    const afterRevoke = await refreshWith(t3);
+    expect(afterRevoke.status).toBe(401);
+  });
+
+  it('rejects a refresh request without a cookie', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/refresh')
+      .expect(401);
+    expect(res.body.message).toBe('Missing refresh token');
+  });
 });

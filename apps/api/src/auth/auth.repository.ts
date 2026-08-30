@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@nestjs/common';
 import { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { getDb, refreshTokens, restaurants, schema, users } from '@restaurant/db';
@@ -55,5 +55,37 @@ export class AuthRepository {
       .where(eq(refreshTokens.tokenHash, tokenHash))
       .limit(1);
     return row ?? null;
+  }
+
+  async revokeAllForUser(userId: string, db: Db = getDb()): Promise<void> {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date().toISOString() })
+      .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+  }
+
+  /**
+   * Atomically replaces an active refresh token: the replacement is inserted
+   * and the old token revoked with a pointer to its successor in one
+   * transaction, so rotation can never leave two active tokens.
+   */
+  async rotateRefreshToken(
+    oldTokenId: string,
+    replacement: NewRefreshToken,
+    db: Db = getDb()
+  ): Promise<{ oldRow: RefreshTokenRow; newRow: RefreshTokenRow }> {
+    return db.transaction(async (tx) => {
+      const txDb = tx as unknown as Db;
+      const [newRow] = await txDb.insert(refreshTokens).values(replacement).returning();
+      if (!newRow) throw new Error('Failed to insert replacement refresh token');
+      const now = new Date().toISOString();
+      const [oldRow] = await txDb
+        .update(refreshTokens)
+        .set({ revokedAt: now, replacedByTokenId: newRow.id, updatedAt: now })
+        .where(eq(refreshTokens.id, oldTokenId))
+        .returning();
+      if (!oldRow) throw new Error('Failed to revoke rotated refresh token');
+      return { oldRow, newRow };
+    });
   }
 }
