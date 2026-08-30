@@ -231,4 +231,50 @@ describe('Staff auth (integration)', () => {
   it('rejects logout without an access token', async () => {
     await request(app.getHttpServer()).post('/api/v1/auth/staff/logout').expect(401);
   });
+
+  it('returns the authenticated user with restaurant, permissions, and locations', async () => {
+    const slug = uniqueSlug('auth-me');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const session = await loginFor(email, slug);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      email,
+      fullName: 'Owner Person',
+      role: 'owner',
+      restaurant: { slug, currency: 'EGP' },
+    });
+    expect(Array.isArray(res.body.permissions)).toBe(true);
+    expect(res.body.permissions).toContain('*');
+    expect(Array.isArray(res.body.locations)).toBe(true);
+    expect(res.body.locations.length).toBe(1);
+    expect(res.body.locations[0].name).toBe('Main Branch');
+  });
+
+  it('rejects /auth/me without a bearer token', async () => {
+    await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
+  });
+
+  it('rejects an access token whose user no longer exists (tenant isolation)', async () => {
+    const slug = uniqueSlug('auth-me-iso');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+    const session = await loginFor(email, slug);
+
+    // Forge an access token for a user id that does not exist in the tenant.
+    const jwt = new (await import('@nestjs/jwt')).JwtService({ secret: process.env.JWT_SECRET });
+    const forged = await jwt.signAsync({ sub: 'deleted-user', restaurantId: slug, role: 'owner' });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${forged}`)
+      .expect(401);
+    expect(session.accessToken).toBeTruthy();
+  });
 });

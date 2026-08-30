@@ -155,6 +155,42 @@ export class AuthService {
     }
     await this.repo.revokeToken(token.id);
   }
+
+  async me(user: UserRow): Promise<{
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+    permissions: string[];
+    restaurant: { id: string; name: string; slug: string; currency: string };
+    locations: { id: string; name: string }[];
+  }> {
+    const [role, restaurant, assignedLocations] = await Promise.all([
+      this.repo.findRole(user.restaurantId, user.role),
+      this.repo.findRestaurantById(user.restaurantId),
+      this.repo.listLocationsForUser(user.id, user.restaurantId),
+    ]);
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      permissions: parsePermissions(role?.permissions ?? null),
+      restaurant: restaurant ?? { id: user.restaurantId, name: '', slug: '', currency: '' },
+      locations: assignedLocations,
+    };
+  }
+}
+
+function parsePermissions(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((p): p is string => typeof p === 'string');
+  } catch {
+    return [];
+  }
 }
 
 export { ACCESS_TOKEN_TTL };

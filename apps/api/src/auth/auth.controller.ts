@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
   Req,
@@ -11,9 +12,11 @@ import type { Request, Response } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { CurrentUser } from './current-user.decorator.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './cookies.js';
 import { staffLoginSchema } from './dto/login.dto.js';
 import type { StaffLoginDto } from './dto/login.dto.js';
+import type { AppRequest } from './request.types.js';
 
 @Controller('auth')
 export class AuthController {
@@ -50,5 +53,11 @@ export class AuthController {
   ): Promise<void> {
     await this.service.logout(req.userId as string, readRefreshCookie(req));
     clearRefreshCookie(res);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: NonNullable<AppRequest['user']>) {
+    return this.service.me(user);
   }
 }

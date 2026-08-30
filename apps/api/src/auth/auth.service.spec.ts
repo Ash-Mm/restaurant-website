@@ -79,6 +79,25 @@ function fakeRepo() {
     >(),
     revokeAllForUser: jest.fn<(userId: string) => Promise<void>>(),
     revokeToken: jest.fn<(tokenId: string) => Promise<void>>(),
+    findRole: jest.fn<
+      (restaurantId: string, name: string) => Promise<{
+        id: string;
+        restaurantId: string;
+        name: string;
+        permissions: string | null;
+      } | null>
+    >(),
+    findRestaurantById: jest.fn<
+      (restaurantId: string) => Promise<{
+        id: string;
+        name: string;
+        slug: string;
+        currency: string;
+      } | null>
+    >(),
+    listLocationsForUser: jest.fn<
+      (userId: string, restaurantId: string) => Promise<{ id: string; name: string }[]>
+    >(),
   };
 }
 
@@ -364,5 +383,67 @@ describe('AuthService.logout', () => {
     const service = makeService(repo);
     await expect(service.logout('u1', 'stale-token')).resolves.toBeUndefined();
     expect(repo.revokeToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.me', () => {
+  let repo: FakeRepo;
+
+  beforeEach(() => {
+    repo = fakeRepo();
+    repo.findRole.mockResolvedValue({
+      id: 'role1',
+      restaurantId: 'r1',
+      name: 'owner',
+      permissions: JSON.stringify(['*']),
+    });
+    repo.findRestaurantById.mockResolvedValue({
+      id: 'r1',
+      name: 'Acme',
+      slug: 'acme',
+      currency: 'EGP',
+    });
+    repo.listLocationsForUser.mockResolvedValue([{ id: 'l1', name: 'Main Branch' }]);
+  });
+
+  it('returns the user with permissions, restaurant, and assigned locations', async () => {
+    const service = makeService(repo);
+
+    const result = await service.me(
+      makeUser({ id: 'u1', restaurantId: 'r1', role: 'owner' })
+    );
+
+    expect(result).toEqual({
+      id: 'u1',
+      email: 'owner@acme.test',
+      fullName: 'Owner One',
+      role: 'owner',
+      permissions: ['*'],
+      restaurant: { id: 'r1', name: 'Acme', slug: 'acme', currency: 'EGP' },
+      locations: [{ id: 'l1', name: 'Main Branch' }],
+    });
+    expect(repo.findRole).toHaveBeenCalledWith('r1', 'owner');
+    expect(repo.listLocationsForUser).toHaveBeenCalledWith('u1', 'r1');
+  });
+
+  it('returns empty permissions when the role row is missing', async () => {
+    repo.findRole.mockResolvedValue(null);
+    const service = makeService(repo);
+
+    const result = await service.me(makeUser({ role: 'custom-role' }));
+    expect(result.permissions).toEqual([]);
+  });
+
+  it('returns empty permissions when the role permissions json is malformed', async () => {
+    repo.findRole.mockResolvedValue({
+      id: 'role1',
+      restaurantId: 'r1',
+      name: 'owner',
+      permissions: 'not-json',
+    });
+    const service = makeService(repo);
+
+    const result = await service.me(makeUser());
+    expect(result.permissions).toEqual([]);
   });
 });

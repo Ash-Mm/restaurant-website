@@ -1,7 +1,16 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@nestjs/common';
 import { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { getDb, refreshTokens, restaurants, schema, users } from '@restaurant/db';
+import {
+  getDb,
+  locations,
+  refreshTokens,
+  restaurants,
+  roles,
+  schema,
+  userLocations,
+  users,
+} from '@restaurant/db';
 
 type Db = LibSQLDatabase<typeof schema>;
 export type UserRow = typeof users.$inferSelect;
@@ -69,6 +78,55 @@ export class AuthRepository {
       .update(refreshTokens)
       .set({ revokedAt: new Date().toISOString() })
       .where(and(eq(refreshTokens.id, tokenId), isNull(refreshTokens.revokedAt)));
+  }
+
+  async findRole(
+    restaurantId: string,
+    name: string,
+    db: Db = getDb()
+  ): Promise<{ id: string; restaurantId: string; name: string; permissions: string | null } | null> {
+    const [row] = await db
+      .select({
+        id: roles.id,
+        restaurantId: roles.restaurantId,
+        name: roles.name,
+        permissions: roles.permissions,
+      })
+      .from(roles)
+      .where(and(eq(roles.restaurantId, restaurantId), eq(roles.name, name)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findRestaurantById(restaurantId: string, db: Db = getDb()) {
+    const [row] = await db
+      .select({
+        id: restaurants.id,
+        name: restaurants.name,
+        slug: restaurants.slug,
+        currency: restaurants.currency,
+      })
+      .from(restaurants)
+      .where(eq(restaurants.id, restaurantId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async listLocationsForUser(
+    userId: string,
+    restaurantId: string,
+    db: Db = getDb()
+  ): Promise<{ id: string; name: string }[]> {
+    return db
+      .select({ id: locations.id, name: locations.name })
+      .from(userLocations)
+      .innerJoin(locations, eq(locations.id, userLocations.locationId))
+      .where(
+        and(
+          eq(userLocations.userId, userId),
+          eq(userLocations.restaurantId, restaurantId)
+        )
+      );
   }
 
   /**
