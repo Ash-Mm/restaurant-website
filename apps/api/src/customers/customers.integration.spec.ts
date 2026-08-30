@@ -27,7 +27,6 @@ async function createRestaurant(slug: string): Promise<string> {
 describe('Guest order identity (integration)', () => {
   let app: INestApplication;
   let slug: string;
-  let restaurantId: string;
 
   beforeAll(async () => {
     await applyMigrations();
@@ -39,7 +38,7 @@ describe('Guest order identity (integration)', () => {
     );
     await app.init();
     slug = uniqueSlug('guest');
-    restaurantId = await createRestaurant(slug);
+    await createRestaurant(slug);
   });
 
   async function openSession(body: Record<string, unknown> = {}, overrideSlug?: string) {

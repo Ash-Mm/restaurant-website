@@ -82,8 +82,10 @@ describe('parsePermissions', () => {
 
 describe('PermissionsGuard', () => {
   it('passes when no permissions metadata is present (no db call)', async () => {
-    const repo = fakeRepo({ permissions: '["*"]' });
-    const findRole = repo.findRole as ReturnType<typeof jest.fn>;
+    const findRole = jest
+      .fn<(restaurantId: string, name: string) => Promise<{ permissions: string | null } | null>>()
+      .mockResolvedValue({ permissions: '["*"]' });
+    const repo = { findRole } as unknown as AuthRepository;
     const guard = new PermissionsGuard(fakeReflector(undefined), repo);
     const req: FakeRequest = { restaurantId: 'r1', user: makeUser() };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);

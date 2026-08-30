@@ -469,7 +469,7 @@ describe('Auth audit logs (integration)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/auth/staff/logout')
-      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .set('Authorization', `Bearer ${String(login.body.accessToken)}`)
       .set('Cookie', `refresh_token=${token}`)
       .expect(204);
 

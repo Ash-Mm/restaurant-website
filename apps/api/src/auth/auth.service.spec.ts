@@ -104,10 +104,11 @@ function fakeRepo() {
 type FakeRepo = ReturnType<typeof fakeRepo>;
 
 function makeService(repo: FakeRepo): AuthService {
+  const audit = { log: jest.fn<() => Promise<void>>().mockResolvedValue(undefined) };
   return new AuthService(
     repo as unknown as AuthRepository,
     new JwtService({ secret: 'test-secret' }),
-    { log: jest.fn(async () => undefined) } as never
+    audit as never
   );
 }
 

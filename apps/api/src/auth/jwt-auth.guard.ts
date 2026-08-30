@@ -46,9 +46,7 @@ export class JwtAuthGuard implements CanActivate {
     // Preserve a tenant resolved earlier in the chain (e.g. TenantGuard's
     // X-Restaurant-Slug): PermissionsGuard relies on comparing it against the
     // authenticated user's restaurant to reject cross-tenant access.
-    if (req.restaurantId === undefined) {
-      req.restaurantId = user.restaurantId;
-    }
+    req.restaurantId ??= user.restaurantId;
     return true;
   }
 }

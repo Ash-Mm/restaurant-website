@@ -71,10 +71,12 @@ export class CustomersService {
       restaurantId,
       hashTrackingToken(rawToken)
     );
+    const expiresAt = row?.trackingExpiresAt;
     if (
       !row ||
-      row.trackingExpiresAt === null ||
-      row.trackingExpiresAt <= new Date().toISOString()
+      expiresAt === null ||
+      expiresAt === undefined ||
+      expiresAt <= new Date().toISOString()
     ) {
       throw new UnauthorizedException('Invalid tracking token');
     }
