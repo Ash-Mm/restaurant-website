@@ -67,6 +67,17 @@ describe('JwtAuthGuard', () => {
     expect(repo.findUserById).toHaveBeenCalledWith('r1', 'u1');
   });
 
+  it('does not overwrite a restaurantId already resolved from the request', async () => {
+    const token = await jwt.signAsync({ sub: 'u1', restaurantId: 'r1', role: 'owner' });
+    repo.findUserById.mockResolvedValue(makeUser());
+    const guard = makeGuard();
+    const { req, ctx } = ctxFor({ authorization: `Bearer ${token}` });
+    req.restaurantId = 'r-from-slug-header';
+
+    expect(await guard.canActivate(ctx)).toBe(true);
+    expect(req.restaurantId).toBe('r-from-slug-header');
+  });
+
   it('rejects a missing Authorization header', async () => {
     await expect(makeGuard().canActivate(ctxFor({}).ctx)).rejects.toBeInstanceOf(
       UnauthorizedException

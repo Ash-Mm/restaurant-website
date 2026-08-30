@@ -16,6 +16,6 @@ import { AuthController } from './auth.controller.js';
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthRepository],
-  exports: [JwtModule],
+  exports: [JwtModule, AuthRepository],
 })
 export class AuthModule {}

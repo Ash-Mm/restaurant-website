@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { verify } from '@node-rs/argon2';
 import { ACCESS_TOKEN_TTL, REFRESH_TTL_MS } from './auth.constants.js';
 import { AuthRepository, type UserRow } from './auth.repository.js';
+import { parsePermissions } from './permissions.util.js';
 import type { StaffLoginDto } from './dto/login.dto.js';
 
 /**
@@ -181,17 +182,6 @@ export class AuthService {
       restaurant: restaurant ?? { id: user.restaurantId, name: '', slug: '', currency: '' },
       locations: assignedLocations,
     };
-  }
-}
-
-function parsePermissions(json: string | null): string[] {
-  if (!json) return [];
-  try {
-    const parsed: unknown = JSON.parse(json);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((p): p is string => typeof p === 'string');
-  } catch {
-    return [];
   }
 }
 
