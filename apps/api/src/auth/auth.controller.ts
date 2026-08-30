@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
@@ -24,6 +25,7 @@ export class AuthController {
 
   @Post('staff/login')
   @HttpCode(200)
+  @UseGuards(ThrottlerGuard)
   async login(
     @Body(new ZodValidationPipe(staffLoginSchema)) dto: StaffLoginDto,
     @Res({ passthrough: true }) res: Response

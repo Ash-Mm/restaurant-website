@@ -296,3 +296,48 @@ describe('Staff auth (integration)', () => {
     expect(session.accessToken).toBeTruthy();
   });
 });
+
+describe('Staff auth rate limiting (integration)', () => {
+  let app: INestApplication;
+  const password = 'password123';
+
+  beforeAll(async () => {
+    process.env.LOGIN_RATE_LIMIT = '5';
+    await applyMigrations();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true })
+    );
+    await app.init();
+  });
+
+  it('throttles the login endpoint after 5 requests from one IP (429)', async () => {
+    const slug = uniqueSlug('auth-throttle');
+    const email = `${slug}@example.com`;
+    await request(app.getHttpServer())
+      .post('/api/v1/admin/tenants')
+      .send({
+        name: 'Test Restaurant',
+        slug,
+        fullName: 'Owner Person',
+        email,
+        password,
+        currency: 'EGP',
+      })
+      .expect(201);
+
+    for (let i = 0; i < 5; i++) {
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/staff/login')
+        .send({ email, password })
+        .expect(200);
+    }
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password })
+      .expect(429);
+    expect(res.body.statusCode).toBe(429);
+  });
+});
