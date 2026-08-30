@@ -55,6 +55,13 @@ export const api = {
     request<{ currency: string; timezone: string; defaultLanguage: string; settings: Record<string, string> }>(
       '/admin/settings'
     ),
+  getPublicProfile: (slug: string) =>
+    request<{
+      logoUrl: string | null;
+      brandColor: string | null;
+      receiptHeader: string | null;
+      receiptFooter: string | null;
+    }>(`/public/${slug}/menu`),
   updateBranding: (body: unknown) =>
     request<{ id: string }>('/admin/settings/branding', {
       method: 'PATCH',

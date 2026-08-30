@@ -1,37 +1,12 @@
 import 'reflect-metadata';
-import { join } from 'node:path';
-import { readdirSync, readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { getDb } from '@restaurant/db';
 import { AppModule } from '../app.module.js';
+import { applyMigrations, uniqueSlug, useInMemoryDb } from '../testing/sqlite.js';
 
-process.env.DATABASE_URL = 'file::memory:?cache=shared';
-
-async function applyMigrations(): Promise<void> {
-  const dir = join(__dirname, '../../../../packages/db/drizzle');
-  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-  const client = getDb().$client;
-  for (const file of files) {
-    const sql = readFileSync(join(dir, file), 'utf8').replace(/-->[^\n]*\n/g, '');
-    for (const raw of sql.split(';')) {
-      const stmt = raw
-        .split('\n')
-        .filter((line) => !line.trim().startsWith('--'))
-        .join('\n')
-        .trim();
-      if (stmt) {
-        await client.execute(stmt);
-      }
-    }
-  }
-}
-
-function uniqueSlug(prefix: string): string {
-  return `${prefix}-${String(Date.now())}-${String(Math.floor(Math.random() * 1e6))}`;
-}
+useInMemoryDb();
 
 describe('Tenant & location CRUD (integration)', () => {
   let app: INestApplication;

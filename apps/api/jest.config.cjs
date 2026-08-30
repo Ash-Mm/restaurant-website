@@ -8,6 +8,7 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@restaurant/(db|contracts|config|ui)$': '<rootDir>/../../packages/$1/src/index.ts',
+    '^@restaurant/db/migrate$': '<rootDir>/../../packages/db/src/migrate.ts',
   },
   transform: {
     '^.+\\.tsx?$': [
