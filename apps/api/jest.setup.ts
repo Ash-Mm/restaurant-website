@@ -7,3 +7,8 @@ import 'reflect-metadata';
 jest.mock('@restaurant/db/migrate', () => ({
   runMigrations: jest.fn().mockResolvedValue(undefined),
 }));
+
+// Keep the login rate limiter out of the way for normal test flows. The
+// dedicated rate-limit integration test overrides this to the real value
+// before compiling its own app instance.
+process.env.LOGIN_RATE_LIMIT ??= '1000';

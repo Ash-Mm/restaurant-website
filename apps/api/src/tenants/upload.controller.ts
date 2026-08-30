@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantGuard } from '../auth/tenant.guard.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import { PermissionsGuard } from '../auth/permissions.guard.js';
+import { RequirePermissions } from '../auth/permissions.decorator.js';
 import { RestaurantId } from '../auth/restaurant.decorator.js';
 
 interface UploadedFilePayload {
@@ -21,9 +24,10 @@ interface UploadedFilePayload {
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 @Controller('admin')
-@UseGuards(TenantGuard)
+@UseGuards(TenantGuard, JwtAuthGuard, PermissionsGuard)
 export class UploadController {
   @Post('upload')
+  @RequirePermissions('settings:write')
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @RestaurantId() restaurantId: string,

@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { auditLogs, getDb } from '@restaurant/db';
 import { AppModule } from '../app.module.js';
 import { applyMigrations, uniqueSlug, useInMemoryDb } from '../testing/sqlite.js';
 
@@ -294,5 +296,185 @@ describe('Staff auth (integration)', () => {
       .set('Authorization', `Bearer ${forged}`)
       .expect(401);
     expect(session.accessToken).toBeTruthy();
+  });
+});
+
+describe('Staff auth rate limiting (integration)', () => {
+  let app: INestApplication;
+  const password = 'password123';
+
+  beforeAll(async () => {
+    process.env.LOGIN_RATE_LIMIT = '5';
+    await applyMigrations();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true })
+    );
+    await app.init();
+  });
+
+  it('throttles the login endpoint after 5 requests from one IP (429)', async () => {
+    const slug = uniqueSlug('auth-throttle');
+    const email = `${slug}@example.com`;
+    await request(app.getHttpServer())
+      .post('/api/v1/admin/tenants')
+      .send({
+        name: 'Test Restaurant',
+        slug,
+        fullName: 'Owner Person',
+        email,
+        password,
+        currency: 'EGP',
+      })
+      .expect(201);
+
+    for (let i = 0; i < 5; i++) {
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/staff/login')
+        .send({ email, password })
+        .expect(200);
+    }
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password })
+      .expect(429);
+    expect(res.body.statusCode).toBe(429);
+  });
+});
+
+describe('Auth audit logs (integration)', () => {
+  let app: INestApplication;
+  const password = 'password123';
+
+  beforeAll(async () => {
+    process.env.LOGIN_RATE_LIMIT = '1000';
+    await applyMigrations();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true })
+    );
+    await app.init();
+  });
+
+  async function createTenant(slug: string, email: string): Promise<void> {
+    await request(app.getHttpServer())
+      .post('/api/v1/admin/tenants')
+      .send({
+        name: 'Test Restaurant',
+        slug,
+        fullName: 'Owner Person',
+        email,
+        password,
+        currency: 'EGP',
+      })
+      .expect(201);
+  }
+
+  async function actions(action: string): Promise<
+    { userId: string | null; restaurantId: string; metadata: string | null }[]
+  > {
+    const db = getDb();
+    const rows = await db
+      .select({
+        userId: auditLogs.userId,
+        restaurantId: auditLogs.restaurantId,
+        metadata: auditLogs.metadata,
+      })
+      .from(auditLogs)
+      .where(eq(auditLogs.action, action));
+    return rows;
+  }
+
+  it('records a successful login with user and restaurant, and no secrets', async () => {
+    const slug = uniqueSlug('audit-in');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password })
+      .expect(200);
+    const refreshCookie = cookieList(res).find((c) => c.startsWith('refresh_token='));
+    const rawToken = refreshCookie === undefined ? '' : rawCookieValue(refreshCookie);
+
+    const rows = await actions('auth.login.success');
+    const row = rows[rows.length - 1];
+    expect(row).toBeDefined();
+    expect(row?.userId).toBe(res.body.user.id);
+    expect(row?.restaurantId).toBeDefined();
+    expect(row?.metadata).toContain(email);
+    expect(row?.metadata).not.toContain(password);
+    expect(row?.metadata).not.toContain(rawToken);
+  });
+
+  it('records a failed login (wrong password)', async () => {
+    const slug = uniqueSlug('audit-fail');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password: 'not-the-password' })
+      .expect(401);
+
+    const rows = await actions('auth.login.failure');
+    const row = rows[rows.length - 1];
+    expect(row).toBeDefined();
+    expect(row?.userId).not.toBeNull();
+    expect(row?.metadata).not.toContain('not-the-password');
+  });
+
+  it('records refresh token reuse detection', async () => {
+    const slug = uniqueSlug('audit-reuse');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password })
+      .expect(200);
+    const cookie = cookieList(login).find((c) => c.startsWith('refresh_token='));
+    const firstToken = cookie === undefined ? '' : rawCookieValue(cookie);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/refresh')
+      .set('Cookie', `refresh_token=${firstToken}`)
+      .expect(200);
+    // Replay the rotated token → reuse detection.
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/refresh')
+      .set('Cookie', `refresh_token=${firstToken}`)
+      .expect(401);
+
+    const rows = await actions('auth.refresh.reuse_detected');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[rows.length - 1]?.userId).not.toBeNull();
+  });
+
+  it('records a logout', async () => {
+    const slug = uniqueSlug('audit-out');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password })
+      .expect(200);
+    const cookie = cookieList(login).find((c) => c.startsWith('refresh_token='));
+    const token = cookie === undefined ? '' : rawCookieValue(cookie);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/logout')
+      .set('Authorization', `Bearer ${String(login.body.accessToken)}`)
+      .set('Cookie', `refresh_token=${token}`)
+      .expect(204);
+
+    const rows = await actions('auth.logout');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[rows.length - 1]?.userId).toBe(login.body.user.id);
   });
 });

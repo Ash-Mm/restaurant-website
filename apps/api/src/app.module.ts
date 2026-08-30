@@ -5,9 +5,10 @@ import { HealthController } from './health/health.controller.js';
 import { TenantsModule } from './tenants/tenants.module.js';
 import { LocationsModule } from './locations/locations.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CustomersModule } from './customers/customers.module.js';
 
 @Module({
-  imports: [TenantsModule, LocationsModule, AuthModule],
+  imports: [TenantsModule, LocationsModule, AuthModule, CustomersModule],
   controllers: [HealthController],
 })
 export class AppModule implements OnModuleInit {

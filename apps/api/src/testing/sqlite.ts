@@ -22,7 +22,19 @@ export async function applyMigrations(): Promise<void> {
         .join('\n')
         .trim();
       if (stmt) {
-        await client.execute(stmt);
+        try {
+          await client.execute(stmt);
+        } catch (err) {
+          // Idempotent: multiple app instances in one file share the same
+          // shared-cache in-memory database, so objects/columns may exist.
+          if (
+            err instanceof Error &&
+            /already exists|duplicate column/i.test(err.message)
+          ) {
+            continue;
+          }
+          throw err;
+        }
       }
     }
   }

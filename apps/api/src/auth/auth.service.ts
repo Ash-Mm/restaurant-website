@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { verify } from '@node-rs/argon2';
 import { ACCESS_TOKEN_TTL, REFRESH_TTL_MS } from './auth.constants.js';
 import { AuthRepository, type UserRow } from './auth.repository.js';
+import { parsePermissions } from './permissions.util.js';
+import { AuditService } from '../audit/audit.service.js';
 import type { StaffLoginDto } from './dto/login.dto.js';
 
 /**
@@ -35,7 +37,8 @@ export function hashRefreshToken(rawToken: string): string {
 export class AuthService {
   constructor(
     private readonly repo: AuthRepository,
-    private readonly jwt: JwtService
+    private readonly jwt: JwtService,
+    private readonly audit: AuditService
   ) {}
 
   async issueAccessToken(user: UserRow): Promise<string> {
@@ -50,10 +53,28 @@ export class AuthService {
     const user = await this.resolveUser(dto.email, dto.restaurantSlug);
     const passwordOk = await verify(user.passwordHash, dto.password);
     if (!passwordOk) {
+      // Failed login with a resolvable restaurant: record it (the audit_logs
+      // table requires restaurant_id, so unknown-email attempts are skipped).
+      await this.audit.log({
+        restaurantId: user.restaurantId,
+        userId: user.id,
+        action: 'auth.login.failure',
+        entityType: 'user',
+        entityId: user.id,
+        metadata: { email: dto.email, reason: 'invalid_password' },
+      });
       throw new UnauthorizedException('Invalid email or password');
     }
     const accessToken = await this.issueAccessToken(user);
     const refreshToken = await this.createRefreshToken(user);
+    await this.audit.log({
+      restaurantId: user.restaurantId,
+      userId: user.id,
+      action: 'auth.login.success',
+      entityType: 'user',
+      entityId: user.id,
+      metadata: { email: user.email },
+    });
     return {
       accessToken,
       refreshToken,
@@ -113,6 +134,14 @@ export class AuthService {
     if (token.revokedAt !== null) {
       // Reuse of a rotated token means the session material may be stolen:
       // revoke every active session for this user (token-theft detection).
+      await this.audit.log({
+        restaurantId: token.restaurantId,
+        userId: token.userId,
+        action: 'auth.refresh.reuse_detected',
+        entityType: 'user',
+        entityId: token.userId,
+        metadata: { reason: 'rotated_token_replay' },
+      });
       await this.repo.revokeAllForUser(token.userId);
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -156,6 +185,14 @@ export class AuthService {
       return;
     }
     await this.repo.revokeToken(token.id);
+    await this.audit.log({
+      restaurantId: token.restaurantId,
+      userId,
+      action: 'auth.logout',
+      entityType: 'user',
+      entityId: userId,
+      metadata: {},
+    });
   }
 
   async me(user: UserRow): Promise<{
@@ -181,17 +218,6 @@ export class AuthService {
       restaurant: restaurant ?? { id: user.restaurantId, name: '', slug: '', currency: '' },
       locations: assignedLocations,
     };
-  }
-}
-
-function parsePermissions(json: string | null): string[] {
-  if (!json) return [];
-  try {
-    const parsed: unknown = JSON.parse(json);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((p): p is string => typeof p === 'string');
-  } catch {
-    return [];
   }
 }
 

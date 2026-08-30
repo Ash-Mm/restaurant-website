@@ -78,13 +78,21 @@ describe('Public tenant resolution & branding (integration)', () => {
 
   it('updates branding and reflects it on the public profile', async () => {
     const slug = uniqueSlug('brand');
+    const email = `${slug}@example.com`;
     await request(app.getHttpServer())
       .post('/api/v1/admin/tenants')
-      .send(validTenant(slug, `${slug}@example.com`))
+      .send(validTenant(slug, email))
       .expect(201);
+
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/login')
+      .send({ email, password: 'Sup3rSecret!', restaurantSlug: slug })
+      .expect(200);
+    const token = login.body.accessToken as string;
 
     await request(app.getHttpServer())
       .patch('/api/v1/admin/settings/branding')
+      .set('Authorization', `Bearer ${token}`)
       .set('X-Restaurant-Slug', slug)
       .send({ brandColor: '#1A2B3C', receiptFooter: 'Thanks for visiting!' })
       .expect(200);
