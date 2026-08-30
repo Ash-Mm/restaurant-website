@@ -1,8 +1,17 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { AuthService } from './auth.service.js';
-import { readRefreshCookie, setRefreshCookie } from './cookies.js';
+import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './cookies.js';
 import { staffLoginSchema } from './dto/login.dto.js';
 import type { StaffLoginDto } from './dto/login.dto.js';
 
@@ -30,5 +39,16 @@ export class AuthController {
     const result = await this.service.refresh(readRefreshCookie(req));
     setRefreshCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
+  }
+
+  @Post('staff/logout')
+  @HttpCode(204)
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @Req() req: Request & { userId?: string },
+    @Res({ passthrough: true }) res: Response
+  ): Promise<void> {
+    await this.service.logout(req.userId as string, readRefreshCookie(req));
+    clearRefreshCookie(res);
   }
 }

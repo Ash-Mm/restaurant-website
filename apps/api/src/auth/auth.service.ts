@@ -140,6 +140,21 @@ export class AuthService {
       },
     };
   }
+
+  /**
+   * Revokes the presented refresh token if it belongs to the given user.
+   * Idempotent: a missing or unknown token resolves without error.
+   */
+  async logout(userId: string, rawToken: string | null): Promise<void> {
+    if (!rawToken) {
+      return;
+    }
+    const token = await this.repo.findTokenByHash(hashRefreshToken(rawToken));
+    if (!token || token.userId !== userId) {
+      return;
+    }
+    await this.repo.revokeToken(token.id);
+  }
 }
 
 export { ACCESS_TOKEN_TTL };

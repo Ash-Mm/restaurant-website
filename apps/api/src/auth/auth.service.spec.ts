@@ -78,6 +78,7 @@ function fakeRepo() {
       ) => Promise<{ oldRow: TokenRow; newRow: TokenRow }>
     >(),
     revokeAllForUser: jest.fn<(userId: string) => Promise<void>>(),
+    revokeToken: jest.fn<(tokenId: string) => Promise<void>>(),
   };
 }
 
@@ -317,5 +318,51 @@ describe('AuthService.refresh', () => {
       UnauthorizedException
     );
     expect(repo.findTokenByHash).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.logout', () => {
+  let repo: FakeRepo;
+
+  beforeEach(() => {
+    repo = fakeRepo();
+  });
+
+  it('revokes the presented refresh token when it belongs to the user', async () => {
+    const presented = 'raw-refresh-token';
+    repo.findTokenByHash.mockResolvedValue(
+      makeToken({ tokenHash: createHash('sha256').update(presented).digest('hex'), userId: 'u1' })
+    );
+    const service = makeService(repo);
+
+    await service.logout('u1', presented);
+
+    expect(repo.revokeToken).toHaveBeenCalledTimes(1);
+    expect(repo.revokeToken).toHaveBeenCalledWith('t1');
+  });
+
+  it('does not revoke a refresh token belonging to a different user', async () => {
+    const presented = 'someone-elses-token';
+    repo.findTokenByHash.mockResolvedValue(
+      makeToken({ tokenHash: createHash('sha256').update(presented).digest('hex'), userId: 'u2' })
+    );
+    const service = makeService(repo);
+
+    await service.logout('u1', presented);
+
+    expect(repo.revokeToken).not.toHaveBeenCalled();
+  });
+
+  it('resolves silently when no cookie is present', async () => {
+    const service = makeService(repo);
+    await expect(service.logout('u1', null)).resolves.toBeUndefined();
+    expect(repo.findTokenByHash).not.toHaveBeenCalled();
+  });
+
+  it('resolves silently when the token is unknown (idempotent logout)', async () => {
+    repo.findTokenByHash.mockResolvedValue(null);
+    const service = makeService(repo);
+    await expect(service.logout('u1', 'stale-token')).resolves.toBeUndefined();
+    expect(repo.revokeToken).not.toHaveBeenCalled();
   });
 });

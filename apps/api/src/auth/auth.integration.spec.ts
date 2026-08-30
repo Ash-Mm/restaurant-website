@@ -204,4 +204,31 @@ describe('Staff auth (integration)', () => {
       .expect(401);
     expect(res.body.message).toBe('Missing refresh token');
   });
+
+  it('logs out: revokes the refresh token, clears the cookie, returns 204', async () => {
+    const slug = uniqueSlug('auth-logout');
+    const email = `${slug}@example.com`;
+    await createTenant(slug, email);
+
+    const session = await loginFor(email, slug);
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/staff/logout')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .set('Cookie', `refresh_token=${session.refreshToken}`)
+      .expect(204);
+
+    const cookies = res.headers['set-cookie'] as string[];
+    const cleared = cookies?.find((c) => c.startsWith('refresh_token='));
+    expect(cleared).toBeDefined();
+    expect(cleared).toContain('Max-Age=0');
+
+    // The revoked token can no longer be used to obtain a new access token.
+    const afterLogout = await refreshWith(session.refreshToken);
+    expect(afterLogout.status).toBe(401);
+  });
+
+  it('rejects logout without an access token', async () => {
+    await request(app.getHttpServer()).post('/api/v1/auth/staff/logout').expect(401);
+  });
 });

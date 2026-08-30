@@ -64,6 +64,13 @@ export class AuthRepository {
       .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   }
 
+  async revokeToken(tokenId: string, db: Db = getDb()): Promise<void> {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date().toISOString() })
+      .where(and(eq(refreshTokens.id, tokenId), isNull(refreshTokens.revokedAt)));
+  }
+
   /**
    * Atomically replaces an active refresh token: the replacement is inserted
    * and the old token revoked with a pointer to its successor in one
