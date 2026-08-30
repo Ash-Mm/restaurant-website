@@ -6,6 +6,7 @@ export * from './roles.js';
 export * from './userLocations.js';
 export * from './settings.js';
 export * from './auditLogs.js';
+export * from './refreshTokens.js';
 
 import { restaurants } from './restaurants.js';
 import { locations } from './locations.js';
@@ -14,6 +15,7 @@ import { roles } from './roles.js';
 import { userLocations } from './userLocations.js';
 import { settings } from './settings.js';
 import { auditLogs } from './auditLogs.js';
+import { refreshTokens } from './refreshTokens.js';
 
 export const schema = {
   restaurants,
@@ -23,4 +25,5 @@ export const schema = {
   userLocations,
   settings,
   auditLogs,
+  refreshTokens,
 };
