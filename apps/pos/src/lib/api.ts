@@ -3,6 +3,33 @@ const API_BASE =
 
 const SLUG_KEY = 'restaurantSlug';
 
+// Access token in memory (AGENTS: Never store access tokens in localStorage, DESIGN: access in memory)
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+export function setTokens(tokens: { accessToken: string; refreshToken: string }): void {
+  accessToken = tokens.accessToken;
+  refreshToken = tokens.refreshToken;
+  // Also set a non-httpOnly cookie for Next.js middleware redirect (memory is source of truth)
+  // Never store tokens in localStorage per AGENTS
+  if (typeof document !== 'undefined') {
+    document.cookie = `pos_at=${tokens.accessToken}; path=/; max-age=900; SameSite=Lax`;
+  }
+}
+export function clearTokens(): void {
+  accessToken = null;
+  refreshToken = null;
+  if (typeof document !== 'undefined') {
+    document.cookie = `pos_at=; path=/; max-age=0`;
+  }
+}
+export function getRefreshToken(): string | null {
+  return refreshToken;
+}
+
 export function getRestaurantSlug(): string | null {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem(SLUG_KEY);
@@ -28,6 +55,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
   if (slug) headers.set('x-restaurant-slug', slug);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  // Location isolation: AGENTS requires X-Location-Id when staff scoped
+  const loc = typeof window !== 'undefined' ? window.localStorage.getItem('locationId') : null;
+  if (loc) headers.set('X-Location-Id', loc);
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
@@ -39,6 +70,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  // Auth — AGENTS staff login with email/password, returns access+refresh
+  login: (body: { email: string; password: string }) =>
+    request<{ accessToken: string; refreshToken: string }>('/auth/staff/login', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  refresh: (body: { refreshToken: string }) =>
+    request<{ accessToken: string; refreshToken: string }>('/auth/staff/refresh', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  logout: (body?: { refreshToken?: string }) =>
+    request<{ revoked: number }>('/auth/staff/logout', {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+  me: () =>
+    request<{
+      id: string;
+      email: string;
+      fullName: string;
+      role: string;
+      restaurantId: string;
+      permissions: string[];
+      locations: { id: string; name: string }[];
+    }>('/auth/me'),
   createTenant: (body: unknown) =>
     request<{ id: string; slug: string }>('/admin/tenants', {
       method: 'POST',
