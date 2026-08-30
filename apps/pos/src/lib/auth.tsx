@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, getAccessToken, setTokens, clearTokens, getRefreshToken } from './api';
+import { api, getAccessToken, setTokens, clearTokens } from './api';
 
 interface User {
   id: string;
@@ -48,9 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMut = useMutation({
     mutationFn: async () => {
-      const rt = getRefreshToken();
       try {
-        await api.logout(rt ? { refreshToken: rt } : undefined);
+        await api.logout();
       } finally {
         clearTokens();
         setTokenState(null);

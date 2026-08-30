@@ -3,31 +3,23 @@ const API_BASE =
 
 const SLUG_KEY = 'restaurantSlug';
 
-// Access token in memory (AGENTS: Never store access tokens in localStorage, DESIGN: access in memory)
+// Access token in memory only (AGENTS: never store access tokens in
+// localStorage/cookies readable from JS). The refresh token lives in an
+// httpOnly cookie scoped to /api/v1/auth/staff, managed by the browser.
 let accessToken: string | null = null;
-let refreshToken: string | null = null;
 
 export function getAccessToken(): string | null {
   return accessToken;
 }
-export function setTokens(tokens: { accessToken: string; refreshToken: string }): void {
+export function setTokens(tokens: { accessToken: string; refreshToken?: string }): void {
   accessToken = tokens.accessToken;
-  refreshToken = tokens.refreshToken;
-  // Also set a non-httpOnly cookie for Next.js middleware redirect (memory is source of truth)
-  // Never store tokens in localStorage per AGENTS
-  if (typeof document !== 'undefined') {
-    document.cookie = `pos_at=${tokens.accessToken}; path=/; max-age=900; SameSite=Lax`;
-  }
 }
 export function clearTokens(): void {
   accessToken = null;
-  refreshToken = null;
-  if (typeof document !== 'undefined') {
-    document.cookie = `pos_at=; path=/; max-age=0`;
-  }
 }
 export function getRefreshToken(): string | null {
-  return refreshToken;
+  // Refresh tokens are never exposed to JS; kept for API compatibility.
+  return null;
 }
 
 export function getRestaurantSlug(): string | null {
@@ -50,7 +42,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Auth endpoints never trigger the refresh-on-401 retry (no loops). */
+const AUTH_PATHS = ['/auth/staff/login', '/auth/staff/refresh', '/auth/staff/logout'];
+
+async function rawRequest<T>(path: string, init: RequestInit): Promise<T> {
   const slug = getRestaurantSlug();
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
@@ -60,7 +55,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const loc = typeof window !== 'undefined' ? window.localStorage.getItem('locationId') : null;
   if (loc) headers.set('X-Location-Id', loc);
 
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  // credentials: 'include' so the httpOnly refresh cookie (API origin) is sent
+  // to /auth/staff/refresh and /auth/staff/logout.
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
   if (!res.ok) {
     const text = await res.text();
     throw new ApiError(res.status, text || res.statusText);
@@ -69,23 +66,63 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
+let refreshInFlight: Promise<void> | null = null;
+
+/**
+ * Refreshes the access token exactly once via the httpOnly refresh cookie.
+ * The backend ignores request bodies on /auth/staff/refresh — the cookie does
+ * the work (rotation included). Concurrent 401s share one in-flight refresh.
+ */
+function refreshAccessToken(): Promise<void> {
+  refreshInFlight ??= (async () => {
+    const res = await fetch(`${API_BASE}/auth/staff/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new ApiError(res.status, text || res.statusText);
+    }
+    const data = (await res.json()) as { accessToken: string };
+    setTokens({ accessToken: data.accessToken });
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  try {
+    return await rawRequest<T>(path, init);
+  } catch (err) {
+    const isAuthPath = AUTH_PATHS.some((p) => path.startsWith(p));
+    if (err instanceof ApiError && err.status === 401 && !isAuthPath) {
+      // Access token likely expired (15 min TTL): refresh once and retry once.
+      try {
+        await refreshAccessToken();
+      } catch {
+        throw err;
+      }
+      return rawRequest<T>(path, init);
+    }
+    throw err;
+  }
+}
+
 export const api = {
-  // Auth — AGENTS staff login with email/password, returns access+refresh
+  // Auth — AGENTS staff login with email/password; the refresh token arrives
+  // as an httpOnly cookie (never in the response body).
   login: (body: { email: string; password: string }) =>
-    request<{ accessToken: string; refreshToken: string }>('/auth/staff/login', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  refresh: (body: { refreshToken: string }) =>
-    request<{ accessToken: string; refreshToken: string }>('/auth/staff/refresh', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  logout: (body?: { refreshToken?: string }) =>
-    request<{ revoked: number }>('/auth/staff/logout', {
-      method: 'POST',
-      body: JSON.stringify(body ?? {}),
-    }),
+    request<{ accessToken: string; user: { id: string; email: string; fullName: string; role: string } }>(
+      '/auth/staff/login',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    ),
+  refresh: () =>
+    request<{ accessToken: string }>('/auth/staff/refresh', { method: 'POST' }),
+  logout: () => request<undefined>('/auth/staff/logout', { method: 'POST' }),
   me: () =>
     request<{
       id: string;
