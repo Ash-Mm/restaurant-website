@@ -74,19 +74,21 @@ export class AuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
       const scoped = await this.repo.findUsersByEmail(email, restaurantId);
-      if (scoped.length === 0) {
+      const scopedUser = scoped[0];
+      if (!scopedUser) {
         await verify(DUMMY_HASH, email);
         throw new UnauthorizedException('Invalid email or password');
       }
-      return scoped[0] as UserRow;
+      return scopedUser;
     }
 
     const matches = await this.repo.findUsersByEmail(email);
-    if (matches.length !== 1) {
+    const matchedUser = matches[0];
+    if (matches.length !== 1 || !matchedUser) {
       await verify(DUMMY_HASH, email);
       throw new UnauthorizedException('Invalid email or password');
     }
-    return matches[0] as UserRow;
+    return matchedUser;
   }
 
   private async createRefreshToken(user: UserRow): Promise<string> {
@@ -150,7 +152,7 @@ export class AuthService {
       return;
     }
     const token = await this.repo.findTokenByHash(hashRefreshToken(rawToken));
-    if (!token || token.userId !== userId) {
+    if (token?.userId !== userId) {
       return;
     }
     await this.repo.revokeToken(token.id);

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
@@ -8,7 +8,7 @@ import type { users } from '@restaurant/db';
 
 type UserRow = typeof users.$inferSelect;
 
-function makeUser(overrides: Partial<UserRow>): UserRow {
+function makeUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: 'u1',
     restaurantId: 'r1',

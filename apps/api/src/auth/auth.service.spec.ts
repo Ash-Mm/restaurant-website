@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { createHash } from 'node:crypto';
-import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException } from '@nestjs/common';
 import { hash } from '@node-rs/argon2';
@@ -9,7 +9,7 @@ import type { AuthRepository } from './auth.repository.js';
 import type { users } from '@restaurant/db';
 
 type UserRow = typeof users.$inferSelect;
-type TokenRow = {
+interface TokenRow {
   id: string;
   restaurantId: string;
   userId: string;
@@ -17,7 +17,7 @@ type TokenRow = {
   expiresAt: string;
   revokedAt: string | null;
   replacedByTokenId: string | null;
-};
+}
 
 function makeToken(overrides: Partial<TokenRow>): TokenRow {
   return {
@@ -34,7 +34,7 @@ function makeToken(overrides: Partial<TokenRow>): TokenRow {
 
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
 
-function makeUser(overrides: Partial<UserRow>): UserRow {
+function makeUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: 'u1',
     restaurantId: 'r1',
@@ -265,17 +265,18 @@ describe('AuthService.refresh', () => {
     );
 
     repo.rotateRefreshToken.mockImplementation(
-      async (
+      (
         _oldTokenId: string,
         replacement: { restaurantId: string; userId: string; tokenHash: string }
-      ) => ({
-        oldRow: makeToken({ revokedAt: new Date().toISOString() }),
-        newRow: makeToken({
-          id: 't2',
-          tokenHash: replacement.tokenHash,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        }),
-      })
+      ) =>
+        Promise.resolve({
+          oldRow: makeToken({ revokedAt: new Date().toISOString() }),
+          newRow: makeToken({
+            id: 't2',
+            tokenHash: replacement.tokenHash,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          }),
+        })
     );
 
     const service = makeService(repo);
@@ -284,7 +285,9 @@ describe('AuthService.refresh', () => {
     expect(result.refreshToken).not.toBe(presented);
     expect(result.user).toMatchObject({ id: 'u1', role: 'owner' });
     expect(repo.rotateRefreshToken).toHaveBeenCalledTimes(1);
-    const [oldTokenId, replacement] = repo.rotateRefreshToken.mock.calls[0];
+    const firstRotateCall = repo.rotateRefreshToken.mock.calls[0];
+    if (!firstRotateCall) throw new Error('rotateRefreshToken was not called');
+    const [oldTokenId, replacement] = firstRotateCall;
     expect(oldTokenId).toBe('t1');
     expect(replacement.tokenHash).toBe(
       createHash('sha256').update(result.refreshToken).digest('hex')

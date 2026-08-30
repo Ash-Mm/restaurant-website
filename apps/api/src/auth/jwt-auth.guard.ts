@@ -12,7 +12,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AppRequest>();
-    const header = req.headers['authorization'];
+    const header = req.headers.authorization;
     if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token');
     }
@@ -28,8 +28,8 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired access token');
     }
     if (
-      typeof payload?.sub !== 'string' ||
-      typeof payload?.restaurantId !== 'string'
+      typeof payload.sub !== 'string' ||
+      typeof payload.restaurantId !== 'string'
     ) {
       throw new UnauthorizedException('Invalid or expired access token');
     }

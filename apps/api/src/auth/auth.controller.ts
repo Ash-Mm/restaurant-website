@@ -51,7 +51,10 @@ export class AuthController {
     @Req() req: Request & { userId?: string },
     @Res({ passthrough: true }) res: Response
   ): Promise<void> {
-    await this.service.logout(req.userId as string, readRefreshCookie(req));
+    const userId = req.userId;
+    if (typeof userId === 'string') {
+      await this.service.logout(userId, readRefreshCookie(req));
+    }
     clearRefreshCookie(res);
   }
 

@@ -9,6 +9,25 @@ import { applyMigrations, uniqueSlug, useInMemoryDb } from '../testing/sqlite.js
 useInMemoryDb();
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
 
+interface CookieSource {
+  headers: Record<string, unknown>;
+}
+
+function cookieList(res: CookieSource): string[] {
+  const value = res.headers['set-cookie'];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return [value];
+  return [];
+}
+
+function rawCookieValue(cookie: string): string {
+  const [pair] = cookie.split(';');
+  if (pair === undefined) throw new Error('malformed refresh cookie');
+  const eq = pair.indexOf('=');
+  if (eq === -1) throw new Error('malformed refresh cookie');
+  return pair.slice(eq + 1);
+}
+
 describe('Staff auth (integration)', () => {
   let app: INestApplication;
   const password = 'password123';
@@ -52,15 +71,16 @@ describe('Staff auth (integration)', () => {
     expect(res.body.accessToken.split('.').length).toBe(3);
     expect(res.body.user).toMatchObject({ email, role: 'owner' });
 
-    const cookies = res.headers['set-cookie'];
-    expect(Array.isArray(cookies)).toBe(true);
-    const refreshCookie = (cookies as string[]).find((c) => c.startsWith('refresh_token='));
+    const cookies = cookieList(res);
+    expect(cookies.length).toBeGreaterThan(0);
+    const refreshCookie = cookies.find((c) => c.startsWith('refresh_token='));
     expect(refreshCookie).toBeDefined();
     expect(refreshCookie).toContain('HttpOnly');
     expect(refreshCookie).toContain('Path=/api/v1/auth/staff');
     expect(refreshCookie).toContain('SameSite=Lax');
     // The raw refresh token must never appear in the response body.
-    const rawToken = String(refreshCookie).split(';')[0].split('=')[1];
+    const rawToken = refreshCookie === undefined ? '' : rawCookieValue(refreshCookie);
+    expect(rawToken.length).toBeGreaterThan(0);
     expect(JSON.stringify(res.body)).not.toContain(rawToken);
   });
 
@@ -135,11 +155,11 @@ describe('Staff auth (integration)', () => {
       .post('/api/v1/auth/staff/login')
       .send(payload)
       .expect(200);
-    const cookie = (res.headers['set-cookie'] as string[]).find((c) =>
+    const cookie = cookieList(res).find((c) =>
       c.startsWith('refresh_token=')
     );
     if (!cookie) throw new Error('login did not set refresh cookie');
-    return { accessToken: res.body.accessToken, refreshToken: cookie.split(';')[0].split('=')[1] };
+    return { accessToken: res.body.accessToken, refreshToken: rawCookieValue(cookie) };
   }
 
   async function refreshWith(token: string) {
@@ -153,11 +173,10 @@ describe('Staff auth (integration)', () => {
       });
   }
 
-  function tokenFrom(res: { headers: Record<string, unknown> }): string {
-    const cookies = res.headers['set-cookie'] as string[];
-    const cookie = cookies?.find((c) => c.startsWith('refresh_token='));
+  function tokenFrom(res: CookieSource): string {
+    const cookie = cookieList(res).find((c) => c.startsWith('refresh_token='));
     if (!cookie) throw new Error('no refresh cookie on response');
-    return cookie.split(';')[0].split('=')[1];
+    return rawCookieValue(cookie);
   }
 
   it('rotates the refresh token and invalidates the old one', async () => {
@@ -218,8 +237,7 @@ describe('Staff auth (integration)', () => {
       .set('Cookie', `refresh_token=${session.refreshToken}`)
       .expect(204);
 
-    const cookies = res.headers['set-cookie'] as string[];
-    const cleared = cookies?.find((c) => c.startsWith('refresh_token='));
+    const cleared = cookieList(res).find((c) => c.startsWith('refresh_token='));
     expect(cleared).toBeDefined();
     expect(cleared).toContain('Max-Age=0');
 
