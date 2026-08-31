@@ -20,6 +20,21 @@ export default function HomePage() {
             Branding settings
           </Button>
         </Link>
+        <Link href="/categories">
+          <Button variant="outline" className="w-full">
+            Category management
+          </Button>
+        </Link>
+        <Link href="/products">
+          <Button variant="outline" className="w-full">
+            Product management
+          </Button>
+        </Link>
+        <Link href="/login">
+          <Button variant="outline" className="w-full">
+            Staff login
+          </Button>
+        </Link>
       </nav>
     </main>
   );

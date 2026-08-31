@@ -109,6 +109,44 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+export interface Category { id: string; name: string; sortOrder: number; createdAt: string; updatedAt: string }
+export interface Product {
+  id: string;
+  categoryId: string | null;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  barcode: string | null;
+  priceMinor: number;
+  isAvailable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ModifierGroup {
+  id: string;
+  productId: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  options: ModifierOption[];
+}
+export interface ModifierOption { id: string; modifierGroupId: string; name: string; priceDeltaMinor: number }
+export interface PublicMenuResponse {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  brandColor: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  currency: string;
+  timezone: string;
+  defaultLanguage: string;
+  locations: { id: string; name: string }[];
+  categories: Category[];
+  products: (Product & { modifierGroups?: ModifierGroup[] })[];
+}
+
 export const api = {
   // Auth — AGENTS staff login with email/password; the refresh token arrives
   // as an httpOnly cookie (never in the response body).
@@ -133,6 +171,77 @@ export const api = {
       permissions: string[];
       locations: { id: string; name: string }[];
     }>('/auth/me'),
+  // Categories (Phase 3 task 1 & 10)
+  listCategories: () => request<Category[]>('/admin/categories'),
+  createCategory: (body: { name: string; sortOrder?: number }) =>
+    request<Category>('/admin/categories', { method: 'POST', body: JSON.stringify(body) }),
+  updateCategory: (id: string, body: { name?: string; sortOrder?: number }) =>
+    request<Category>(`/admin/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteCategory: (id: string) => request<{ deleted: boolean }>(`/admin/categories/${id}`, { method: 'DELETE' }),
+  reorderCategories: (body: { orderedIds: string[] }) =>
+    request<Category[]>('/admin/categories/reorder', { method: 'POST', body: JSON.stringify(body) }),
+  // Products (Phase 3 task 3)
+  listProducts: () => request<Product[]>('/admin/products'),
+  getProduct: (id: string) =>
+    request<Product & { modifierGroups: ModifierGroup[] }>(`/admin/products/${id}`),
+  createProduct: (body: {
+    name: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    categoryId?: string | null;
+    barcode?: string | null;
+    priceMinor?: number;
+    isAvailable?: boolean;
+  }) => request<Product>('/admin/products', { method: 'POST', body: JSON.stringify(body) }),
+  updateProduct: (
+    id: string,
+    body: { name?: string; description?: string | null; imageUrl?: string | null; categoryId?: string | null; barcode?: string | null; priceMinor?: number; isAvailable?: boolean },
+  ) => request<Product>(`/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteProduct: (id: string) => request<{ deleted: boolean }>(`/admin/products/${id}`, { method: 'DELETE' }),
+  // Modifier groups (Phase 3 task 4)
+  listModifierGroups: (productId: string) =>
+    request<ModifierGroup[]>(`/admin/products/${productId}/modifier-groups`),
+  createModifierGroup: (productId: string, body: { name: string; minSelect: number; maxSelect: number }) =>
+    request<ModifierGroup>(`/admin/products/${productId}/modifier-groups`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateModifierGroup: (
+    productId: string,
+    groupId: string,
+    body: { name?: string; minSelect?: number; maxSelect?: number },
+  ) =>
+    request<ModifierGroup>(`/admin/products/${productId}/modifier-groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteModifierGroup: (productId: string, groupId: string) =>
+    request<{ deleted: boolean }>(`/admin/products/${productId}/modifier-groups/${groupId}`, {
+      method: 'DELETE',
+    }),
+  // Modifier options (Phase 3 task 5)
+  createModifierOption: (productId: string, groupId: string, body: { name: string; priceDeltaMinor: number }) =>
+    request<ModifierOption>(`/admin/products/${productId}/modifier-groups/${groupId}/options`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateModifierOption: (
+    productId: string,
+    groupId: string,
+    optionId: string,
+    body: { name?: string; priceDeltaMinor?: number },
+  ) =>
+    request<ModifierOption>(`/admin/products/${productId}/modifier-groups/${groupId}/options/${optionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteModifierOption: (productId: string, groupId: string, optionId: string) =>
+    request<{ deleted: boolean }>(
+      `/admin/products/${productId}/modifier-groups/${groupId}/options/${optionId}`,
+      { method: 'DELETE' },
+    ),
+  // Location pricing & availability (Phase 3 tasks 6-7) — reuses product update for location-specific overrides if needed
+  getPublicMenu: (slug: string) => request<PublicMenuResponse>(`/public/${slug}/menu`),
   createTenant: (body: unknown) =>
     request<{ id: string; slug: string }>('/admin/tenants', {
       method: 'POST',
